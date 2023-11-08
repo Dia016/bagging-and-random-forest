@@ -1,0 +1,223 @@
+Introduction to Bagging and Random Forests
+In this notebook, we introduce the concept of bagging, which is shorthand for bootstrap aggregation, where random samples of the data are used to construct multiple learners (machine learning models). Since each learner only sees part of the data, each learner is less accurate than if it had been constructed over the full data set. Thus, each learner is known as a weak learner. A more powerful, meta-estimator is subsequently constructed by averaging over these many weak learners. The approach of constructing weak learners, and combining them into a more powerful estimator is at the heart of several, very powerful machine learning techniques, among which, the most popular one is the random forest.
+
+In this notebook, we first introduce the formalism behind bagging, including a discussion of the concept of bootstrapping. Next, we move on to a discussion of the random forest algorithm, which will include its application to both classification and regression tasks.
+
+
+# Set up Notebook
+%matplotlib inline
+​
+# Standard imports
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+​
+# We do this to ignore several specific Pandas warnings
+import warnings
+warnings.filterwarnings('ignore')
+​
+sns.set_style('white')
+[Back to TOC]
+
+Formalism
+One of the simplest machine learning algorithms to understand is the decision tree. Often, a decision tree is made as large as possible to provide the best predictive model, as this produces a high purity in the leaf nodes. Doing so however, can lead to overfitting, where the model predicts very accurately on the training data but fails to generalize to the test data; the accuracy is, as a result, much lower.
+A simple approach to overcoming the overfitting problem is to train many decision trees on a subset of the data and to average the resulting predictions. This process is known as bootstrap aggregation, which is often shortened to bagging. Of these two terms, aggregation is simple to understand, one simply aggregates (averages) the predictions of the many trees.
+The term bootstrap is a statistical term that defines how a sample can be constructed from an original data set. Given a data set, there are two simple ways to construct a new sample. As a specific example, consider building a list of shows you wish to watch from an online provider like Netflix or Amazon by placing them in virtual cart. In the first approach, when you choose a show from the virtual shelf and place it in your cart, the show is no longer available on the shelf. This is known as sampling without replacement since the show is only present in your cart. In the second approach, you choose a show and place it in your cart, but there remains a copy of the show on the virtual shelf and others can still pick it. This is known as sampling with replacement, since we replace the original instance.
+Sampling with replacement has several advantages that make it important for machine learning. First, we can construct many large samples from our original data set, where each sample is not limited by the size of the original data set. For example, if our original data set contained 100 entries, sampling without replacement would mean we could only create ten new samples that each had ten entries. On the other hand, sampling with replacement means we could create 100 (or more) new samples that each have ten (or more) entries.
+Building many samples from a parent population allows us to build an estimator on each sample and average (or aggregate) the results. This is demonstrated in the following figure, where an original data set is used to train several decision trees. In this case, each tree is constructed from a bootstrap sample of the original data set. The predictions from these trees are aggregated at the end to make a final prediction.
+
+Decision Trees Image
+
+The scikit-learn library provides a bagging meta-estimator, that can generate bootstrap samples, apply a standard estimator (including other algorithms beyond a decision tree), and aggregate the resulting predictions. This technique can be used for classification tasks (BaggingClassifier) or for regression (BaggingRegressor)
+These estimators have several hyperparameters that control their performance:
+
+base_estimator: The estimator to use on each sample; by default this is a decision tree.
+n_estimators: The number of base estimators to create for the ensemble; by default this is ten.
+max_samples : The number of instances to draw from the parent population to train each base estimator; by default this is one.
+max_features: The number of features to draw from the parent population to train each base estimator; by default this is one.
+This bagging estimator allows different basic algorithms, beyond the decision tree, to be used for ensemble learning. For the rest of the notebook, however, we will focus on a specific ensemble technique that efficiently implement bagging by using decision trees: the random forest.
+
+Beyond improved prediction, bagging algorithms provide an additional benefit. Since each tree (or other learning algorithm in the case of a Bagging estimator) is constructed from a subsample of the original data, the performance of that tree can be tested on the data from the original data that were not used in its construction. These data are known as out-of-bag data and provide a useful metric for the performance of each individual tree used in the ensemble.
+
+Random Forest
+Bootstrap is a general procedure that can be used to reduce the variance for those algorithms that have high variances like decision tree. When bagging with decision trees, we are less concerned about individual tree overfitting the training data.
+A random forest employs bagging to create a set of decision trees from a given data set. Each tree is constructed from a bootstrap sample, and the final prediction is generated by aggregating the predictions of the individual trees, just like the previous code example demonstrated by using the mean of the sample means to estimate the population mean.
+Normally, when deciding on a split point during the construction of a decision tree, all features are evaluated and the one that has the highest impurity (or produces the largest information gain) is selected as the feature on which to split along with the value, at which to split that feature. In a random forest, a random subset of all features is used to make the split choice, and the best feature on which to split is selected form this subset.
+This extra randomness produces individual decision trees that are less sensitive to small scale fluctuations, which is known as under-fitting. As a result, each newly created decision tree is a weak learner since they are not constructed from all available information. Yet, since each decision tree is constructed from different sets of features, by aggregating their predictions, the final random forest prediction is improved and less affected by overfitting.
+Each tree in the random forest is constructed from a different combination of features. As a result, we can use the out-of-bag performance from each tree to rank the importance of the features used to construct the trees in the forest. This allows for robust estimates of feature importance to be computed after constructing a random forest, which can provide useful insight into the nature of a training data set.
+
+[Back to TOC]
+
+Random Forest: Classification
+Having completed the discussion on bootstrap aggregation, and introduced the random forest algorithm, we can now transition to putting this powerful ensemble algorithm to work. The scikit-learn library provides a robust implementation of the random forest algorithm. This implementation includes the Bagging estimator's hyperparameters. The two most important hyperparameters for a random forest are
+n_estimators, The number of decision trees that will be constructed to build the forest; the default value is 10 before sciket-learn v0.22 and 100 afterwards.
+max_features, The number of features to examine when choosing the best split feature and value. By default this is auto, which means the square root of the total number of features. Other values can be an integer number of features, a floating point percentage of the total number of features (e.g., 25% of all features randomly selected), the square root of the total number of features, and the base two logarithm of the total number of features.
+You may run help(RandomForestClassifier) to view more details about the model and the hyper parameters.
+
+To demonstrate using a random forest with the scikit-learn library, we will use Adult Income Dataset to see the impact of a random forest on generating predictions from a complex data set.
+
+Classification: Adult Income Data
+We can now apply the Random Forest algorithm to the Adult Income data to create a classification model. The basic approach is simple, and follows the standard scikit-learn estimator philosophy:
+
+Prepare data. We first load data, then create label from Salary column, then encode categorical features. Note that for tree-based ensemble classifier, we don't have to create dummy variables for categorical features, and we also don't need to scale or normalize training features. Finally, we will split the data into training and testing sets.
+Import our estimator, RandomForestClassifier, from the proper scikit-learn module, ensemble.
+Create the estimator and specify the appropriate hyperparameters. For a random forest, we can accept the defaults, or specify values for specific hyperparameters such as n_estimators or max_features.
+Fit the model to the training data.
+Predict new classes with our trained model (or in the simple demonstration below, generate a performance metric via the score method).
+These steps are demonstrated in the following Code cell.
+
+In the first Code cell, we load the data and create label from Salary.
+In the second Code cell, we encode categorical features we are going to choose. We will only encode features with string values. We will define label and data, and then split them to 60% training and 40% testing.
+In the third Code cell, we create the estimator, the only hyperparameter that we specify at this time is random_state in order to ensure reproducibility. Then we fit the estimator to our training data and generate a performance score on the testing data.
+In the next Code cell we plot the confusion matrix.
+
+
+
+# Read CSV data
+adult_data = pd.read_csv('data/adult_income.csv')
+​
+# Create label column, one for >50K, zero otherwise.
+adult_data['Label'] = adult_data['Salary'].map(lambda x : 1 if '>50K' in x else 0)
+​
+adult_data.sample(5)
+​
+Age	Workclass	FNLWGT	Education	EducationLevel	MaritalStatus	Occupation	Relationship	Race	Sex	CapitalGain	CapitalLoss	HoursPerWeek	NativeCountry	Salary	Label
+871	52	Self-emp-not-inc	162381	HS-grad	9	Divorced	Sales	Not-in-family	White	Male	0	0	40	United-States	<=50K	0
+1588	36	Private	312206	HS-grad	9	Married-civ-spouse	Machine-op-inspct	Husband	White	Male	0	0	40	United-States	<=50K	0
+2106	49	Private	188823	HS-grad	9	Divorced	Prof-specialty	Not-in-family	White	Male	0	0	42	United-States	<=50K	0
+3683	51	Private	313146	HS-grad	9	Married-civ-spouse	Adm-clerical	Husband	White	Male	0	0	40	United-States	<=50K	0
+464	20	Local-gov	235894	Some-college	10	Never-married	Farming-fishing	Own-child	White	Male	0	0	40	United-States	<=50K	0
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+​
+# Encode categorical features with string value
+adult_data['Sex_code'] = LabelEncoder().fit_transform(adult_data.Sex)
+adult_data['Relationship_code'] = LabelEncoder().fit_transform(adult_data.Relationship)
+adult_data['Race_code'] = LabelEncoder().fit_transform(adult_data.Race)
+​
+#pick training features
+data = adult_data[['Age', 'HoursPerWeek', 'EducationLevel', 'CapitalGain', 'CapitalLoss', 'Sex_code', 'Relationship_code', 'Race_code']]
+label = adult_data['Label']
+​
+#split to training and testing
+d_train, d_test, l_train, l_test = train_test_split(data, label, test_size=0.4, random_state=23)
+from sklearn.ensemble import RandomForestClassifier
+from sklearn import metrics
+​
+adult_model = RandomForestClassifier(random_state=23)
+​
+adult_model.fit(d_train, l_train)
+​
+# Classify test data and display score and report
+predicted = adult_model.predict(d_test)
+score = metrics.accuracy_score(l_test, predicted)
+print(f'Decision Tree Classification [Adult Data] Score = {score:.1%}\n')
+print(f'Classification Report:\n {metrics.classification_report(l_test, predicted)}\n')
+​
+Decision Tree Classification [Adult Data] Score = 83.2%
+
+Classification Report:
+               precision    recall  f1-score   support
+
+           0       0.86      0.93      0.89      1211
+           1       0.70      0.54      0.61       389
+
+    accuracy                           0.83      1600
+   macro avg       0.78      0.73      0.75      1600
+weighted avg       0.82      0.83      0.82      1600
+
+
+from helper_code import mlplots as ml
+​
+# Call confusion matrix plotting routine
+ml.confusion(l_test, predicted, ['Low', 'High'], 'Random Forest Classification')
+
+Random Forest: Feature Importance
+As the previous example demonstrated, the random forest is easy to use and often provides impressive results. In addition, by its very nature, a random forest provides an implicit measure of the importance of the individual features in generating the final predictions. While an individual decision tree provides this information, the random forest provides an aggregated result, which is generally more insightful and less sensitive to fluctuations in the training data that might bias the importance values determined by a decision tree. In the calculation of feature importance from a random forest, higher values indicate a more important feature.
+We demonstrate how to extract the feature importance for a random forest classifier in the following Code cell. We zip the training data column names with the model's feature_importances_ attribute, then convert it to a dataframe so that we can sort by the importance and print it out.
+From the feature importance we can see that Sex and Race are not very important in determining income, comparing to Age and Education Level.
+
+# Display feature importance as computed from the random forest
+feature_importance = pd.DataFrame(list(zip(d_train.columns, adult_model.feature_importances_)), columns=['Feature', 'Importance'])
+feature_importance = feature_importance.sort_values(by='Importance', ascending=False)
+feature_importance
+
+Feature	Importance
+0	Age	0.305124
+2	EducationLevel	0.172062
+3	CapitalGain	0.145879
+6	Relationship_code	0.143123
+1	HoursPerWeek	0.139373
+4	CapitalLoss	0.049631
+7	Race_code	0.027451
+5	Sex_code	0.017357
+Student Exercise
+
+In the previous Code cell, we create random forest classifier with default hyperparamemter values. Try making the following changes and compare the different results.
+
+Set the values of hyperparameter n_estimators to 5, 10 and 15.
+Set hyperparameter max_features to different values to indicate how many features should be used in the splitting process.
+​
+[Back to TOC]
+
+Random Forest: Regression
+A random forest can also be used to perform regression; however, in this case the goal is to create trees whose leaf nodes contain data that are nearby in the overall feature space. To make a prediction from a continuous value from a tree, we either have leaf nodes with only one feature, and use the relevant feature from that instance as our predictor, or we compute summary statistics from the instances in the appropriate leaf node, such as the mean or mode. In the end, the random forest aggregates the individual tree regression predictions into a final prediction.
+To perform regression with the scikit-learn library we employ the RandomForestRegressor estimator in the tree module. One point, which was also true for classification, by specifying the random_state hyperparameter, we ensure reproducibility. This is because every time a tree is constructed, the features are randomly selected. Thus, even if we use the same set of hyperparameters and the same set of training data, we can end up with different trees, and thus a different forest, if the random_state hyperparameter is not fixed.
+In this section we employ a random forest to perform regression on the automotive fuel performance prediction as these data were fully described in the Introduction to Decision Trees notebook. First, we will introduce these data, and prepare them for the regression task. Then we will employ the patsy module to use a regression formula to create our dependent and independent feature matrices. Finally, we will construct a decision tree regressor on these data and evaluate its performance.
+
+
+Regression: Auto MPG Data
+Random forest can also be used to perform regression. To perform regression with the scikit-learn library we employ the RandomForestRegressor estimator in the ensemble module. This estimator employs the same set of hyperparameters as the RandomForestClassifier estimator, and is therefore, used in a similar manner. One other point, which is also true for classification, by specifying the random_state hyperparameter, we ensure reproducibility.
+In this section we employ decision trees to perform regression on the automobile fuel performance prediction data. The data contains nine features: mpg, cylinders, displacement, horsepower, weight, acceleration, model year, origin, and car name. Of these, the first is generally treated as the dependent variable (i.e., we wish to predict the fuel efficiency of the cars), while the next seven features are generally used as the independent variables. The last feature (car name) is a string that is unlikely to be useful when predicting on new, unseen data, and therefore, is not included in our analysis.
+In the first two Code cells, we load the data into a DataFrame, then encode origin column. After this, we select our independent and dependent variables.
+
+auto_data = pd.read_csv('mpg.csv')
+auto_data['origin_code'] = LabelEncoder().fit_transform(auto_data.origin)
+auto_data.sample(5)
+
+mpg	cylinders	displacement	horsepower	weight	acceleration	model_year	origin	name	origin_code
+366	17.6	6	225.0	85.0	3465	16.6	81	usa	chrysler lebaron salon	2
+284	20.6	6	225.0	110.0	3360	16.6	79	usa	dodge aspen 6	2
+305	28.4	4	151.0	90.0	2670	16.0	79	usa	buick skylark limited	2
+373	24.0	4	140.0	92.0	2865	16.4	82	usa	ford fairmont futura	2
+80	22.0	4	122.0	86.0	2395	16.0	72	usa	ford pinto (sw)	2
+
+# pick dependent and independent variables
+y = auto_data['mpg']
+x = auto_data[['cylinders', 'displacement', 'weight', 'acceleration', 'model_year', 'origin_code']]
+
+With the dependent variable(y) and independent variable(x) determined, we can now build a regressive model. First, we import the RandomForestRegressor before splitting our independent and dependent variables into training and testing samples. Next, we create our estimator, specifying a value for our random_state hyperparameter to enable reproducibility. Finally, we fit the model and display a predictive score.
+The second Code cell computes several different regression performance metrics and displays the results.
+This model predicts the fuel performance fairly well. You may compare the regression performance metrics with that of other machine learning algorithms we introduced in previous lessons.
+
+from sklearn.ensemble import RandomForestRegressor
+​
+# Split data intro training:testing data set
+ind_train, ind_test, dep_train, dep_test = train_test_split(x, y, test_size=0.4, random_state=23)
+​
+# Create Regressor with default properties
+auto_model = RandomForestRegressor(random_state=23)
+​
+# Fit estimator and display score
+auto_model.fit(ind_train, dep_train)
+print(f'Score = {auto_model.score(ind_test, dep_test):.1%}')
+Score = 84.6%
+from sklearn import metrics
+​
+# Regress on test data
+pred = auto_model.predict(ind_test)
+​
+# Copute performance metrics
+mae = metrics.mean_absolute_error(dep_test, pred)
+mse = metrics.mean_squared_error(dep_test, pred)
+mr2 = metrics.r2_score(dep_test, pred)
+​
+# Display metrics
+print(f'R^2 Score             = {mr2:.3f}')
+print(f'Mean Absolute Error   = {mae:.2f}')
+print(f'Mean Squared Error    = {mse:.2f}')
+​
+R^2 Score             = 0.846
+Mean Absolute Error   = 2.15
+Mean Squared Error    = 8.28
